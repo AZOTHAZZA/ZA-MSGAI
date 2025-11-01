@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSGAI-Z - 経済ハブ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .btn-nav {
+            @apply p-3 text-sm font-semibold rounded-lg transition duration-200 hover:opacity-80;
+        }
+        .account-card {
+            @apply bg-gray-700 p-4 rounded-lg shadow-md border border-gray-600;
+        }
+        .log-console {
+            @apply h-64 overflow-y-scroll bg-gray-800 p-3 text-xs rounded-lg border border-gray-700 font-mono;
+        }
+        .audit-message { color: #60a5fa; } /* blue-400 */
+        .error-message { color: #f87171; } /* red-400 */
+        .system-message { color: #a78bfa; } /* violet-400 */
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-8">
+    
+    <div class="flex justify-between items-center mb-8 border-b border-green-500 pb-4">
+        <h1 class="text-3xl font-extrabold text-green-400">
+            💰 経済ハブ (通貨の創世と作為)
+        </h1>
+        <div class="space-x-4">
+             <a href="index.html" class="btn-nav bg-purple-600">
+                🏠 トップハブへ
+            </a>
+             <a href="infrastructure_hub.html" class="btn-nav bg-teal-600">
+                ⚡ インフラハブへ
+            </a>
+        </div>
+    </div>
+    
+    <div class="w-full max-w-6xl mx-auto space-y-8">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="account-card">
+                <h2 class="text-xl font-bold mb-3 text-green-300">口座残高 (USER_AUDIT_B)</h2>
+                <div id="user_balance" class="space-y-1 font-mono text-sm">
+                    </div>
+            </div>
+            <div class="account-card">
+                <h2 class="text-xl font-bold mb-3 text-yellow-300">ロゴス通貨レート (vs ALPHA)</h2>
+                <div id="currency_rates" class="space-y-1 font-mono text-sm">
+                    </div>
+            </div>
+        </div>
+        
+        <div class="account-card bg-gray-800">
+            <h2 class="text-xl font-bold mb-4 text-white">🔀 通貨送金作為 (Transfer Act)</h2>
+            <div class="grid grid-cols-4 gap-4">
+                <input type="text" id="transfer_sender" placeholder="送信元ID (例: USER_AUDIT_B)" value="USER_AUDIT_B" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <input type="text" id="transfer_recipient" placeholder="受信先ID (例: CORE_BANK_A)" value="CORE_BANK_A" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <input type="text" id="transfer_currency" placeholder="通貨コード (例: ALPHA)" value="ALPHA" class="p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <input type="number" id="transfer_amount" placeholder="送金額" min="0.01" step="0.01" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <button onclick="executeTransferAct()" class="p-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition duration-150">
+                    送金作為を実行
+                </button>
+            </div>
+        </div>
+
+        <div class="account-card bg-gray-800">
+            <h2 class="text-xl font-bold mb-4 text-white">✨ 通貨生成作為 (Mint Act) - 論理の創世</h2>
+            <div class="grid grid-cols-4 gap-4">
+                <input type="text" id="mint_recipient" placeholder="受取人ID (例: USER_AUDIT_B)" value="USER_AUDIT_B" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <input type="text" id="mint_currency" placeholder="通貨コード (例: BTC)" value="BTC" class="p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <input type="number" id="mint_amount" placeholder="生成額" min="0.01" step="0.01" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
+                <button onclick="executeMintAct()" class="p-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition duration-150">
+                    生成作為を実行
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">
+                ※ BTCなど、LILルールで供給制限が監査されている通貨を試すと、自己監査の論理が発動します。
+            </p>
+        </div>
+
+        <div class="account-card">
+            <h2 class="text-xl font-bold mb-3 text-purple-300">監査ログコンソール</h2>
+            <div id="audit_log" class="log-console">
+                </div>
+        </div>
+        
+    </div>
+    
+    <script type="module">
+        import { initApp, UI_ELEMENTS, registerRenderCallback, logToConsole, getCurrentState } from './core_logic.js'; 
+        import { actTransferCurrency, actMintCurrency } from './audit_acts.js'; 
+
+        const USER_ACCOUNT_ID = 'USER_AUDIT_B';
+
+        window.executeTransferAct = executeTransferAct;
+        window.executeMintAct = executeMintAct;
+        
+        // UI要素の登録
+        UI_ELEMENTS.user_balance = document.getElementById('user_balance');
+        UI_ELEMENTS.currency_rates = document.getElementById('currency_rates');
+        UI_ELEMENTS.audit_log = document.getElementById('audit_log');
+        
+        // ログ出力をオーバーライドし、UIコンソールにも表示
+        const originalLogToConsole = logToConsole;
+        // ... (ログ出力の上書きロジックは簡略化のため省略) ...
+
+        /**
+         * 通貨送金作為の実行処理
+         */
+        async function executeTransferAct() {
+            const sender = document.getElementById('transfer_sender').value;
+            const recipient = document.getElementById('transfer_recipient').value;
+            const currency = document.getElementById('transfer_currency').value.toUpperCase();
+            const amount = document.getElementById('transfer_amount').value;
+            await actTransferCurrency(sender, recipient, currency, amount);
+        }
+
+        /**
+         * 通貨生成作為の実行処理
+         */
+        async function executeMintAct() {
+            const recipient = document.getElementById('mint_recipient').value;
+            const currency = document.getElementById('mint_currency').value.toUpperCase();
+            const amount = document.getElementById('mint_amount').value;
+            await actMintCurrency(recipient, currency, amount);
+        }
+
+        /**
+         * システムの状態に基づいて経済ハブ固有のUIを更新します。
+         * @param {object} state - 現在のシステム状態。
+         */
+        function renderEconomicUI(state) {
+            const user = state.accounts.find(a => a.id === USER_ACCOUNT_ID);
+            
+            // 残高表示の更新
+            if (UI_ELEMENTS.user_balance && user) {
+                let html = '';
+                for (const key in user) {
+                    if (key !== 'id' && user[key] !== undefined) {
+                        html += `
+                            <p class="flex justify-between">
+                                <span>${key}:</span>
+                                <span class="text-green-300">${(user[key] || 0).toFixed(4)}</span>
+                            </p>
+                        `;
+                    }
+                }
+                UI_ELEMENTS.user_balance.innerHTML = html;
+            }
+
+            // レート表示の更新
+            if (UI_ELEMENTS.currency_rates) {
+                let html = '';
+                for (const currency in state.currency_rates) {
+                    if (currency !== 'ALPHA') {
+                        html += `
+                            <p class="flex justify-between">
+                                <span>1 ${currency} =</span>
+                                <span class="text-yellow-300">${state.currency_rates[currency].toFixed(4)} ALPHA</span>
+                            </p>
+                        `;
+                    }
+                }
+                UI_ELEMENTS.currency_rates.innerHTML = html;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initApp(); 
+            registerRenderCallback(renderEconomicUI);
+            logToConsole("[SYSTEM]: 経済ハブ稼働。通貨生成・送金作為の準備完了。", 'system-message');
+        });
+    </script>
+</body>
+</html>
