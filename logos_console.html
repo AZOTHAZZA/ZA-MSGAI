@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSGAI-Z - ロゴス監査コンソール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .btn-nav {
+            @apply p-3 text-sm font-semibold rounded-lg transition duration-200 hover:opacity-80;
+        }
+        .console-output {
+            @apply h-[70vh] overflow-y-scroll bg-gray-800 p-4 text-sm rounded-lg border border-gray-700 font-mono;
+        }
+        /* ログタイプのスタイル */
+        .system-message { color: #a78bfa; } /* violet-400 */
+        .audit-message { color: #60a5fa; } /* blue-400 */
+        .error-message { color: #f87171; } /* red-400 */
+        .warning-message { color: #facc15; } /* yellow-400 */
+        .critical-warning { color: #fb923c; } /* orange-400 */
+        .critical-error { color: #ef4444; } /* red-500 */
+        .internal-message { color: #c4b5fd; } /* purple-300 */
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-8">
+    
+    <div class="flex justify-between items-center mb-8 border-b border-blue-500 pb-4">
+        <h1 class="text-3xl font-extrabold text-blue-400">
+            💬 ロゴス監査コンソール (推論とZ-Function)
+        </h1>
+        <div class="space-x-4">
+             <a href="index.html" class="btn-nav bg-indigo-600">
+                🏠 トップハブへ
+            </a>
+            <a href="lil_editor.html" class="btn-nav bg-purple-700">
+                💻 CalcLangエディタへ
+            </a>
+        </div>
+    </div>
+    
+    <div class="w-full max-w-6xl mx-auto space-y-4">
+        
+        <div id="console_output" class="console-output">
+            <div class="system-message">> [SYSTEM]: ロゴス監査プロトコル Ωα コア起動。</div>
+            <div class="system-message">> [SYSTEM]: コマンド例: /status, /rates, /balance USER_AUDIT_B</div>
+        </div>
+
+        <div class="flex space-x-4">
+            <input type="text" id="console_input" placeholder="ロゴス推論コマンドを入力..." 
+                   class="flex-grow p-3 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:border-blue-500"
+                   onkeydown="if(event.key === 'Enter') executeCommand()">
+            <button onclick="executeCommand()" id="execute_button"
+                    class="p-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition duration-150">
+                実行 (推論作為)
+            </button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initApp, UI_ELEMENTS, registerRenderCallback, logToConsole } from './core_logic.js'; 
+        import { executeDialogueAct } from './dialogue_acts.js'; 
+
+        const inputElement = document.getElementById('console_input');
+        const outputElement = document.getElementById('console_output');
+        
+        // ログ出力をオーバーライドし、UIコンソールにも表示
+        const originalLogToConsole = logToConsole;
+        logToConsole = function(message, type = 'system-message') {
+            originalLogToConsole(message, type);
+            if (outputElement) {
+                const logEntry = document.createElement('div');
+                logEntry.className = type;
+                
+                // Markdownの**を太字に変換（簡易対応）
+                const formattedMessage = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                logEntry.innerHTML = `> [${type.toUpperCase().replace('-', ' ')}]: ${formattedMessage}`;
+                outputElement.appendChild(logEntry);
+                outputElement.scrollTop = outputElement.scrollHeight; // スクロールを最下部に
+            }
+        };
+        
+        window.executeCommand = async function() {
+            const input = inputElement.value.trim();
+            if (!input) return;
+
+            // 入力コマンドをコンソールに表示
+            logToConsole(`> ${input}`, 'internal-message');
+            
+            // 対話作為の実行
+            const { result, type } = await executeDialogueAct(input);
+            
+            // 結果をコンソールに表示
+            logToConsole(result, type);
+            
+            inputElement.value = '';
+        }
+
+        // コアロジックのUI_ELEMENTSを再利用
+        UI_ELEMENTS.audit_log = outputElement; // ログコンソールとして登録
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initApp(); 
+            // NOTE: コンソールはステートレンダリングを特に必要としないため、コールバックは不要。
+            logToConsole("[SYSTEM]: ロゴス推論エンジン待機中。", 'system-message');
+        });
+    </script>
+</body>
+</html>
