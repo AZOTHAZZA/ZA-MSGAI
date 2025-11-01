@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSGAI-Z - CalcLang/LIL エディタ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .json-editor {
+            font-family: monospace;
+            min-height: 60vh;
+            white-space: pre-wrap;
+            tab-size: 4;
+            @apply p-4 rounded-lg bg-gray-700 text-green-300 border border-gray-600 focus:outline-none focus:border-indigo-500;
+        }
+        .btn-nav {
+            @apply p-3 text-sm font-semibold rounded-lg transition duration-200 hover:opacity-80;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-8">
+    
+    <div class="flex justify-between items-center mb-8 border-b border-indigo-500 pb-4">
+        <h1 class="text-3xl font-extrabold text-indigo-400">
+            💻 CalcLang/LIL エディタ (論理創世)
+        </h1>
+        <div class="space-x-4">
+             <a href="index.html" class="btn-nav bg-purple-600">
+                🏠 トップハブへ
+            </a>
+            <a href="economic_hub.html" class="btn-nav bg-green-700">
+                💰 経済ハブへ
+            </a>
+        </div>
+    </div>
+    
+    <div class="w-full max-w-6xl mx-auto space-y-6">
+
+        <p class="text-gray-400 mb-4">
+            ロゴス中間言語 (LIL) は、システムの監査論理を定義します。変更はFirestore経由で即座にシステムコアロジックに反映されます。**JSON構文と論理要素の両方が厳密に監査されます。**
+        </p>
+
+        <textarea id="lil_editor" class="json-editor w-full"></textarea>
+        
+        <div id="validation_output" class="p-3 rounded-lg bg-gray-800 border border-gray-700 min-h-[40px] text-sm">
+            LILルールの検証結果が出力されます。
+        </div>
+
+        <div class="flex justify-between">
+            <button id="save_button" onclick="saveLILRules()" 
+                    class="p-4 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-bold transition duration-150 disabled:opacity-50">
+                💾 LILルールを保存し、自己監査を適用
+            </button>
+            <button id="reset_button" onclick="loadInitialLILRules()" 
+                    class="p-4 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition duration-150">
+                🔄 初期LILルールをロード
+            </button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { INITIAL_LIL_RULES } from './logos_lil.js';
+        import { logToConsole, KNOWLEDGE } from './core_logic.js'; // KNOWLEDGEはcore_logic経由でインポート
+        import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+        const db = getFirestore(getApp());
+        const auth = getAuth(getApp());
+        const lilDocRef = doc(db, 'system_config', 'lil_rules');
+
+        const editor = document.getElementById('lil_editor');
+        const saveButton = document.getElementById('save_button');
+        const validationOutput = document.getElementById('validation_output');
+
+        window.saveLILRules = saveLILRules;
+        window.loadInitialLILRules = loadInitialLILRules;
+
+        /**
+         * FirestoreからLILルールをロードし、エディタに表示します。
+         */
+        async function loadLILRules() {
+            try {
+                const docSnap = await getDoc(lilDocRef);
+                const rules = docSnap.exists() && docSnap.data().rules ? docSnap.data().rules : INITIAL_LIL_RULES;
+                editor.value = JSON.stringify(rules, null, 4);
+                validationOutput.innerHTML = `<p class="text-blue-400">✅ LILルールがFirestoreからロードされました。</p>`;
+            } catch (e) {
+                validationOutput.innerHTML = `<p class="text-red-500">❌ Firestoreからのロードエラー: ${e.message}</p>`;
+                editor.value = JSON.stringify(INITIAL_LIL_RULES, null, 4);
+            }
+        }
+
+        /**
+         * 初期LILルールをエディタにロードします。
+         */
+        function loadInitialLILRules() {
+            editor.value = JSON.stringify(INITIAL_LIL_RULES, null, 4);
+            validationOutput.innerHTML = `<p class="text-red-500">⚠ 初期LILルールがエディタにロードされました。保存するとFirestoreに上書きされます。</p>`;
+        }
+
+        /**
+         * LILルールの基本的な構造（配列、オブジェクトなど）を監査します。
+         */
+        function validateLILStructure(rules) {
+            if (!Array.isArray(rules)) {
+                return "ルールは配列でなければなりません。";
+            }
+            for (const rule of rules) {
+                if (!rule.id || !rule.description || !Array.isArray(rule.triggers) || !Array.isArray(rule.actions)) {
+                    return `ルール ${rule.id || '不明'}: 'id', 'description', 'triggers', 'actions' のいずれかが欠落しています。`;
+                }
+            }
+            return null;
+        }
+
+        /** * LILの論理的要素を監査 (CalcLangの自己検証)
+         * - 演算子、通貨コード、フラグの存在確認など
+         */
+        function auditLILLogic(rules) {
+            const validOperators = ["==", ">", "<", ">=", "<="];
+            // KNOWLEDGEから有効な通貨コードとINFRAチェックパスを取得
+            const validCurrencies = KNOWLEDGE.DEFINITIONS.CURRENCIES.map(c => c.code);
+            const validInfraParams = ["energy_supply.value", "net_stability.value"];
+
+            for (const rule of rules) {
+                for (const trigger of rule.triggers) {
+                    if (!validOperators.includes(trigger.operator)) {
+                        return `ルール ${rule.id}: 無効な演算子 "${trigger.operator}" が使用されています。`;
+                    }
+                    
+                    if (trigger.type === "CURRENCY_CHECK" && trigger.param === "CODE" && !validCurrencies.includes(trigger.value)) {
+                         return `ルール ${rule.id}: 未定義の通貨 "${trigger.value}" がチェックされています。`;
+                    }
+                    
+                    if (trigger.type === "INFRA_CHECK" && !validInfraParams.includes(trigger.param)) {
+                         return `ルール ${rule.id}: 無効なINFRA_CHECKパラメータ "${trigger.param}" です。`;
+                    }
+                }
+                
+                for (const action of rule.actions) {
+                    if (action.type === "SET_STATE" && action.param !== "isHalted") {
+                         return `ルール ${rule.id}: SET_STATEパラメーターは現在 'isHalted' のみに限定されています。`;
+                    }
+                    // NOTE: SET_FLAGやZ_FUNCTION_CALLのparamは動的拡張の余地があるため、ここでは簡易的なチェックに留める
+                }
+            }
+            return null;
+        }
+
+
+        /**
+         * LILルールを保存し、CalcLangの自己監査を適用します。
+         */
+        async function saveLILRules() {
+            saveButton.disabled = true;
+            try {
+                const rawJson = editor.value;
+                const newRules = JSON.parse(rawJson);
+                
+                // 1. JSON構文とLIL構造の検証
+                const validationError = validateLILStructure(newRules);
+                if (validationError) {
+                    validationOutput.innerHTML = `<p class="text-red-500">❌ **JSON/LIL構造検証エラー:** ${validationError}</p>`;
+                    return;
+                }
+                
+                // 2. CalcLang論理監査の実行 (自己検証)
+                const auditError = auditLILLogic(newRules);
+                if (auditError) {
+                    validationOutput.innerHTML = `<p class="text-red-500">❌ **CalcLang論理監査エラー:** ${auditError}</p>`;
+                    return;
+                }
+
+                // 3. Firestoreに保存 (監査を通過)
+                await updateDoc(lilDocRef, { rules: newRules });
+                
+                validationOutput.innerHTML = `<p class="text-green-500">✅ **LIL検証・保存成功:** 新しいルールがロゴス監査プロトコルに自己適用されました。</p>`;
+                logToConsole("[LIL EDITOR]: LILルールが保存され、CalcLangの論理が更新されました。", 'system-message');
+
+            } catch (e) {
+                validationOutput.innerHTML = `<p class="text-red-500">❌ **JSON構文エラー:** 無効なJSONです。${e.message}</p>`;
+            } finally {
+                saveButton.disabled = false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+             // ログイン状態に応じてロード
+             if (auth.currentUser) {
+                await loadLILRules();
+            } else {
+                // auth.onAuthStateChangedがcore_logicで処理されるため、ここでは単にロードをトリガー
+                loadLILRules(); 
+            }
+        });
+    </script>
+</body>
+</html>
