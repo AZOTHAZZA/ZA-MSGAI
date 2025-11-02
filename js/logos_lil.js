@@ -1,14 +1,13 @@
 // js/logos_lil.js - ロゴス監査プロトコルの低レベル論理 (LIL)
 
-// LIL監査プロトコルの定数と論理関数を定義します。
-// exportキーワードを削除し、このファイルが通常のスクリプトとして読み込まれるようにします。
+// CRITICAL FIX: exportキーワードを削除し、グローバル変数として定義する。
 
 const LIL_AUDIT_THRESHOLDS = {
     VIBRATION_CRITICAL: 8000,
     VIBRATION_HIGH: 5000,
-    ALPHA_LIQUIDITY_WARNING: 1000000, // システム全体のALPHA流動性警告
-    BRIDGE_OUT_WARNING: 50000,        // 1回のブリッジアウトの閾値
-    LABOR_DEMAND_STAGNATION: 10000,   // 労働需要スコアの最低値
+    ALPHA_LIQUIDITY_WARNING: 1000000, 
+    BRIDGE_OUT_WARNING: 50000,        
+    LABOR_DEMAND_STAGNATION: 10000,   
 };
 
 /**
@@ -26,7 +25,7 @@ function applyLILAudits(state) {
             level: "HALT_IMMEDIATE",
             message: "Vibrationが臨界点を超過。論理的連続性 HALT が強制されます。",
         });
-        state.systemState.isHalted = true; // 強制HALT
+        state.systemState.isHalted = true; 
     } else if (state.vibrationScore > LIL_AUDIT_THRESHOLDS.VIBRATION_HIGH) {
         auditLogs.push({
             id: "LIL_R2_VIB_HIGH",
@@ -34,11 +33,6 @@ function applyLILAudits(state) {
             message: "Vibrationが高水準。ACT_Z_REMEDIATE の実行が必要です。",
         });
     }
-
-    // R2: 生計維持のためのブリッジアウト監査
-    // ACT_BRIDGE_OUTが頻繁に、または大量に行われた場合の警告
-    // 状態変更は audit_acts.js 側で行われるが、ここでは LIL 警告を発生させる
-    // NOTE: このルールは、ブリッジアウト作為のログが追跡されていることを前提とする。
 
     // R3: 労働需要の監査
     if (state.logos_labor_pool.total_demand_score < LIL_AUDIT_THRESHOLDS.LABOR_DEMAND_STAGNATION) {
