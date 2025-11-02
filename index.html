@@ -94,44 +94,49 @@
     </div>
     
     <script type="module">
-        import { initApp, UI_ELEMENTS, registerRenderCallback, VIBRATION_LIMIT } from './core_logic.js'; 
+        // 🚨 CRITICAL FIX: import パスを正しい相対パス './js/core_logic.js' に修正
+        import { initApp, UI_ELEMENTS, registerRenderCallback, VIBRATION_LIMIT } from './js/core_logic.js'; 
         
         // UI要素の登録
-        UI_ELEMENTS.vibration_value = document.getElementById('vibration_value');
-        UI_ELEMENTS.vibration_bar = document.getElementById('vibration_bar');
-        UI_ELEMENTS.user_id = document.getElementById('user_id');
-        UI_ELEMENTS.halt_status = document.getElementById('halt_status');
+        const localElements = {
+            vibration_value: document.getElementById('vibration_value'),
+            vibration_bar: document.getElementById('vibration_bar'),
+            user_id: document.getElementById('user_id'),
+            halt_status: document.getElementById('halt_status')
+        };
+        
+        // 外部core_logic.jsで定義されたUI_ELEMENTSにローカル要素をマージ
+        Object.assign(UI_ELEMENTS, localElements);
 
         /**
          * システムの状態に基づいてUIを更新します。
          * @param {object} state - 現在のシステム状態。
          */
         function renderMainUI(state) {
-            const vLevel = state.vibration_level.value;
-            const vPercent = (vLevel / VIBRATION_LIMIT) * 100;
+            // state.vibration_level.value ではなく、state.vibrationScore を直接使用
+            const vScore = state.vibrationScore;
+            // VIBRATION_LIMITはcore_logic.jsからimportされることを前提
+            const vPercent = (vScore / VIBRATION_LIMIT) * 100;
 
             if (UI_ELEMENTS.vibration_value) {
-                UI_ELEMENTS.vibration_value.textContent = `${vLevel.toFixed(1)}%`;
+                UI_ELEMENTS.vibration_value.textContent = `${vScore.toFixed(1)}`;
             }
             if (UI_ELEMENTS.vibration_bar) {
                 UI_ELEMENTS.vibration_bar.style.width = `${Math.min(100, vPercent)}%`;
                 
-                // 色の変更
-                if (vLevel > 80) {
-                    UI_ELEMENTS.vibration_bar.classList.add('bg-red-700');
-                    UI_ELEMENTS.vibration_bar.classList.remove('bg-yellow-500', 'bg-red-500');
-                } else if (vLevel > 50) {
-                    UI_ELEMENTS.vibration_bar.classList.add('bg-yellow-500');
-                    UI_ELEMENTS.vibration_bar.classList.remove('bg-red-700', 'bg-red-500');
+                // 色の変更ロジック
+                if (vScore > (VIBRATION_LIMIT * 0.8)) {
+                    UI_ELEMENTS.vibration_bar.className = 'vibration-bar h-6 bg-red-700 rounded-full';
+                } else if (vScore > (VIBRATION_LIMIT * 0.5)) {
+                    UI_ELEMENTS.vibration_bar.className = 'vibration-bar h-6 bg-yellow-500 rounded-full';
                 } else {
-                    UI_ELEMENTS.vibration_bar.classList.add('bg-red-500');
-                    UI_ELEMENTS.vibration_bar.classList.remove('bg-red-700', 'bg-yellow-500');
+                    UI_ELEMENTS.vibration_bar.className = 'vibration-bar h-6 bg-red-500 rounded-full';
                 }
             }
 
             if (UI_ELEMENTS.halt_status) {
-                if (state.isHalted) {
-                    UI_ELEMENTS.halt_status.textContent = '❌ システム状態: 強制HALT (LIL_007により停止)';
+                if (state.systemState.isHalted) { // 状態オブジェクト内のisHaltedを参照
+                    UI_ELEMENTS.halt_status.textContent = '❌ システム状態: 強制HALT';
                     UI_ELEMENTS.halt_status.classList.remove('text-green-400');
                     UI_ELEMENTS.halt_status.classList.add('text-red-500');
                 } else {
@@ -143,10 +148,21 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            await initApp(); 
-            registerRenderCallback(renderMainUI);
-            // ユーザーIDはcore_logicで設定されたものを表示
-            UI_ELEMENTS.user_id.textContent = localStorage.getItem('appId') || 'N/A';
+            // initAppは状態をロードし、初期化を行う
+            const initialState = await initApp(); 
+            
+            // レンダリングコールバックを登録し、初期状態をUIに反映
+            window.renderMainUI = renderMainUI; // 他のファイルからアクセスできるようにグローバル化
+            // registerRenderCallback(renderMainUI); // core_logic側での登録があれば有効
+            
+            if (initialState) {
+                renderMainUI(initialState);
+            }
+            
+            // ユーザーIDの表示（ローカルストレージからのロードロジックは簡略化）
+            if (UI_ELEMENTS.user_id) {
+                UI_ELEMENTS.user_id.textContent = initialState ? Object.keys(initialState.accounts)[0] : 'USER_AUDIT_A';
+            }
         });
     </script>
 </body>
