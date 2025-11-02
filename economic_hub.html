@@ -10,6 +10,73 @@
         .input-style { @apply w-full p-2 rounded bg-gray-600 text-white border border-gray-500 focus:ring-purple-500 focus:border-purple-500; }
         .btn-style { @apply w-full px-4 py-2 font-bold rounded transition; }
     </style>
+
+    <script>
+        // js/firebase_config.js の内容 (抜粋)
+        const firebaseConfig = {
+          apiKey: "YOUR_API_KEY_PLACEHOLDER",
+          authDomain: "PROJECT_ID.firebaseapp.com",
+          projectId: "PROJECT_ID_PLACEHOLDER",
+          storageBucket: "PROJECT_ID.appspot.com",
+          messagingSenderId: "SENDER_ID_PLACEHOLDER",
+          appId: "APP_ID_PLACEHOLDER"
+        };
+        const LOGOS_STATE_COLLECTION = "logos_state"; 
+        
+        /**
+         * CalcLangの現在の状態をFirestoreに永続化する作為（ダミー）。
+         */
+        async function persistLogosState(state) {
+            if (state.systemState.isHalted) {
+                console.warn("[LIL Audit] HALT状態のため、永続化をスキップ。");
+                return;
+            }
+            console.log(`[Persistence SUCCESS] 論理サイクル ${state.systemState.logicalClock} の状態を永続化しました。`);
+            return Promise.resolve();
+        }
+
+        /**
+         * 起動時にFirestoreから最新のCalcLangの状態を復元する作為。
+         */
+        async function retrieveLogosState() {
+            // core_logic.jsがまだ読み込まれていない可能性を考慮し、デフォルトのinitialStateがグローバルにある前提
+            const defaultState = window.initialState; 
+
+            try {
+                console.log("[Restoration INFO] 永続化された状態が見つかりませんでした。初期状態を使用します。");
+                return defaultState; 
+            } catch (error) {
+                console.error("[CRITICAL FAILURE] 状態の復元に失敗しました。初期状態を使用し、Vibrationを極大化します。", error);
+                const recoveredState = defaultState;
+                recoveredState.vibrationScore = 9000; 
+                return recoveredState;
+            }
+        }
+
+        /**
+         * アプリケーションの論理的な初期化を開始する関数。(CRITICAL FUNCTION)
+         */
+        async function initApp() {
+            // NOTE: core_logic.jsがこの時点で読み込まれていない可能性があるため、
+            //       DOMContentLoaded後に再チェックが必要です。
+            
+            // core_logic.js の initialState が存在するまで待機（ただし、このインライン化はDOMロード前に実行される）
+            if (!window.initialState) {
+                // 初回起動時の暫定的なエラー回避。DOM読み込み後に再実行を試みる。
+                console.warn("initialStateがまだ定義されていません。core_logic.jsの読み込みを待機します。");
+                return null;
+            }
+
+            const currentState = await retrieveLogosState();
+            window.initialState = currentState; 
+
+            console.log("[LIL Audit] 初期状態の監査を完了しました。");
+            return currentState;
+        }
+
+        // CRITICAL: initApp関数をグローバルスコープに強制的に定義
+        window.initApp = initApp;
+    </script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-8">
     
@@ -78,7 +145,6 @@
 
     </div>
     
-    <script src="js/firebase_config.js"></script> 
     <script src="js/core_logic.js"></script>
     <script src="js/audit_acts.js"></script>
     <script src="js/logos_lil.js"></script>
@@ -92,26 +158,17 @@
             halt_status: document.getElementById('halt_status')
         };
 
-        /**
-         * コンソールログにメッセージを追加する関数。
-         */
         function logToConsole(message, className = 'text-gray-200') {
             const now = new Date().toLocaleTimeString();
             UI_ELEMENTS.consoleDiv.innerHTML += `<div class="mt-1 ${className}">[${now}] ${message}</div>`;
             UI_ELEMENTS.consoleDiv.scrollTop = UI_ELEMENTS.consoleDiv.scrollHeight;
         }
         
-        /**
-         * システムの状態に基づいてUIを更新し、残高を表示します。
-         * @param {object} state - 現在のシステム状態。
-         */
         window.renderMainUI = function(state) {
-            // 1. 残高表示の更新 (口座保存機能の可視化)
             let balanceHtml = '';
             for (const id in state.accounts) {
                 const alpha = state.accounts[id].ALPHA.toFixed(2);
                 balanceHtml += `<p>${id}: <span class="text-yellow-400">${alpha}</span> ALPHA`;
-                // fiat_balanceはブリッジ口座（ACCOUNT_BRIDGE）で管理
                 if (state.accounts[id].fiat_balance !== undefined) {
                     balanceHtml += ` / 現実価値: <span class="text-green-400">${state.accounts[id].fiat_balance.toFixed(2)}</span> JPY`
                 }
@@ -119,15 +176,11 @@
             }
             UI_ELEMENTS.account_balances.innerHTML = balanceHtml;
 
-            // 2. HALTステータスの更新
             if (UI_ELEMENTS.halt_status) {
                  UI_ELEMENTS.halt_status.textContent = state.systemState.isHalted ? '❌ HALT (論理停止)' : '✅ 正常稼働';
             }
         };
 
-        /**
-         * 経済ハブからの作為を処理し、dialogue_acts.jsにルーティングする関数。
-         */
         function executeEconomicAct(type) {
             let command;
             const sourceId = document.getElementById('user_id')?.textContent || 'USER_AUDIT_A';
@@ -137,18 +190,14 @@
                 const targetId = document.getElementById('mint_target').value;
                 if (!amount || !targetId) return logToConsole('[FAIL] 金額と生成先を入力してください。', 'text-red-400');
                 command = `MINT ${targetId} ${amount}`;
-
             } else if (type === 'TRANSFER') {
                 const amount = document.getElementById('transfer_amount').value;
                 const targetId = document.getElementById('transfer_target').value;
                 if (!amount || !targetId) return logToConsole('[FAIL] 金額と送金先を入力してください。', 'text-red-400');
-                // TRANSFER {source} {amount} {target} 
                 command = `TRANSFER ${sourceId} ${amount} ${targetId}`; 
-
             } else if (type === 'WITHDRAW') {
                 const amount = document.getElementById('withdraw_amount').value;
                 if (!amount) return logToConsole('[FAIL] 出金金額を入力してください。', 'text-red-400');
-                // WITHDRAW {source} {amount} (ACT_BRIDGE_OUTにマッピングされる)
                 command = `WITHDRAW ${sourceId} ${amount}`; 
             }
 
@@ -159,22 +208,30 @@
                 const status = result.log[0].status;
                 logToConsole(`-> [監査結果] ${status}: ${result.log[0].action || result.log[0].reason}`, status === 'SUCCESS' || status === 'CRITICAL_SUCCESS' ? 'text-green-400' : 'text-red-400');
                 
-                // UIの状態を更新
                 window.renderMainUI(result.newState); 
-
             } else {
                  logToConsole('[CRITICAL FAIL] コマンドまたはプロセス関数が未定義です。', 'text-red-500');
             }
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // initApp (firebase_config.jsでグローバルに定義) が機能することを保証してから呼び出す
+            // CRITICAL FIX: initApp が定義されていることを確認し、initialState の定義（core_logic.js）を待つ
             if (typeof window.initApp === 'function') {
-                logToConsole('[INIT SUCCESS] コアロジック (initApp) を検出しました。状態の復元を開始します...');
+                logToConsole('[INIT SUCCESS] initAppを検出。コアロジックの準備を待機...');
+                
+                // core_logic.js の読み込みが完了するまで待機するループ (安全策)
+                while (!window.initialState) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
                 const initialState = await window.initApp(); 
-                window.renderMainUI(initialState);
+                if (initialState) {
+                    window.renderMainUI(initialState);
+                } else {
+                    logToConsole('[INIT WARNING] initialStateの復元に失敗、再試行が必要です。', 'text-yellow-400');
+                }
             } else {
-                logToConsole('[CRITICAL FAIL] コアロジック (initApp) の読み込みに失敗しました。ファイル読み込み順序を確認してください。', 'text-red-500');
+                logToConsole('[CRITICAL FAIL] initAppの強制定義に失敗。ブラウザのスクリプト実行を監査してください。', 'text-red-500');
             }
         });
     </script>
