@@ -1,149 +1,100 @@
-// js/audit_acts.js
+// js/audit_acts.js - 全ての実行可能な作為の定義 (経済作為に特化)
 
-import { 
-    getCurrentState, 
-    saveSystemState, 
-    addVibration, 
-    logToConsole, 
-    LIL_FLAGS, // LILフラグをインポート
-    getCurrencyLogic, // 通貨の論理制限を取得
-    VIBRATION_LIMIT 
-} from './core_logic.js'; 
-
-// ====================================================================
-// 1. 通貨送金作為 (Transfer Currency Act)
-// ====================================================================
-
-/**
- * 通貨の送金を実行します。
- */
-export async function actTransferCurrency(senderId, recipientId, currency, amount) {
-    if (getCurrentState().isHalted) {
-        logToConsole(`🚨 [AUDIT/HALT 拒否]: システムがHALT状態のため、送金作為は拒否されました。`, 'error-message');
-        return;
-    }
+// NOTE: 依存関係は core_logic.js が先に読み込まれている前提です。
+const AUDIT_ACTS_DEFINITION = {
     
-    const state = getCurrentState();
-    const sender = state.accounts.find(a => a.id === senderId);
-    const recipient = state.accounts.find(a => a.id === recipientId);
+    // ----------------------------------------------------
+    // I. 通貨生成の作為 (MINT)
+    // ----------------------------------------------------
+    "MINT": { 
+        description: "ALPHA通貨を論理的に生成し、指定口座に保存する作為。",
+        params: ["targetAccountId", "amount"],
+        baseCost: 10.0,
+        costMetric: "ALPHA",
+        execute: (state, params) => {
+            let newState = { ...state };
+            
+            // パラメータの検証
+            if (params.amount <= 0 || !newState.accounts[params.targetAccountId]) {
+                 return { newState: state, log: [{ status: "FAIL", reason: "不正な金額または口座ID" }] };
+            }
+
+            // 口座残高の増加 (論理的保存)
+            newState.accounts[params.targetAccountId].ALPHA += params.amount;
+            newState.vibrationScore += 5.0; // 論理的コスト
+
+            return { 
+                newState, 
+                log: [{ status: "SUCCESS", action: "MINTED", amount: params.amount, target: params.targetAccountId }] 
+            };
+        }
+    },
     
-    const validation = {
-        amount: parseFloat(amount),
-        error: null
-    };
+    // ----------------------------------------------------
+    // II. 口座間送金の作為 (TRANSFER)
+    // ----------------------------------------------------
+    "TRANSFER": { 
+        description: "ALPHA通貨を口座間で送金する作為。",
+        params: ["sourceAccountId", "targetAccountId", "amount"],
+        baseCost: 0.5,
+        costMetric: "ALPHA",
+        execute: (state, params) => {
+            let newState = { ...state };
 
-    if (!sender || !recipient) {
-        validation.error = "送信者または受信者のアカウントIDが無効です。";
-    } else if (isNaN(validation.amount) || validation.amount <= 0) {
-        validation.error = "送金額は正の値である必要があります。";
-    } else if ((sender[currency] || 0) < validation.amount) {
-        validation.error = `アカウント ${senderId} の ${currency} 残高が不足しています。`;
-    }
+            // 資金不足の検証 (論理的連続性の保証)
+            if (newState.accounts[params.sourceAccountId].ALPHA < params.amount) {
+                 return { newState: state, log: [{ status: "FAIL", reason: "残高不足により送金失敗" }] };
+            }
 
-    if (validation.error) {
-        logToConsole(`❌ [AUDIT/TRANSFER 拒否]: ${validation.error}`, 'error-message');
-        await addVibration(0.2); // 失敗したが、作為試行のコスト
-        return;
-    }
+            // 送金処理
+            newState.accounts[params.sourceAccountId].ALPHA -= params.amount;
+            newState.accounts[params.targetAccountId].ALPHA += params.amount;
+            newState.vibrationScore += 0.5;
 
-    // 作為の実行
-    sender[currency] -= validation.amount;
-    recipient[currency] = (recipient[currency] || 0) + validation.amount;
+            return { 
+                newState, 
+                log: [{ status: "SUCCESS", action: "TRANSFERRED", amount: params.amount }] 
+            };
+        }
+    },
+
+    // ----------------------------------------------------
+    // III. 論理的出金としての作為 (ACT_BRIDGE_OUT)
+    // ----------------------------------------------------
+    "ACT_BRIDGE_OUT": {
+        description: "論理的ブリッジ口座のALPHAをBurnし、現実の有限な価値に変換して出金する作為（生計維持）。",
+        params: ["sourceAccountId", "amount"],
+        baseCost: 100.0,
+        costMetric: "Vibration",
+        
+        execute: (state, params) => {
+            const { sourceAccountId, amount } = params;
+            let newState = { ...state };
+            
+            // 残高検証
+            if (newState.accounts[sourceAccountId].ALPHA < amount) {
+                return { newState: state, log: [{ status: "FAIL", reason: "ALPHA残高不足。出金作為失敗" }] };
+            }
+            
+            // ALPHAの消費 (Burn)
+            newState.accounts[sourceAccountId].ALPHA -= amount;
+            
+            const logosRate = newState.currencyRates.ALPHA_TO_JPY || 1.0; 
+            const fiatAmount = amount * logosRate; 
+            
+            // ブリッジ口座の現実の価値を論理的に減少させる (ATM引き出しの鏡像)
+            if (newState.accounts["ACCOUNT_BRIDGE"] && newState.accounts["ACCOUNT_BRIDGE"].fiat_balance !== undefined) {
+                 newState.accounts["ACCOUNT_BRIDGE"].fiat_balance -= fiatAmount;
+            }
+            
+            newState.vibrationScore += 50.0; // 外部環境との関与によるVibration増大
+            
+            return { 
+                newState, 
+                log: [{ status: "CRITICAL_SUCCESS", action: "BRIDGE_OUT_EXECUTED", fiatAmount: fiatAmount }] 
+            };
+        }
+    },
     
-    const newAccounts = state.accounts.map(acc => {
-        if (acc.id === senderId) return sender;
-        if (acc.id === recipientId) return recipient;
-        return acc;
-    });
-
-    await saveSystemState({ accounts: newAccounts });
-    logToConsole(`[AUDIT/TRANSFER]: アカウント **${senderId}** から **${recipientId}** へ ${validation.amount.toFixed(2)} ${currency} を送金しました。`, 'audit-message');
-    
-    // LIL_006による電力コスト増倍率の適用
-    const baseVibeCost = 1.0;
-    const finalVibeCost = baseVibeCost * LIL_FLAGS.ENERGY_COST_MULTIPLIER; // 増倍率を乗算
-    
-    await addVibration(finalVibeCost);
-}
-
-// ====================================================================
-// 2. 通貨生成作為 (Mint Currency Act)
-// ====================================================================
-
-/**
- * 通貨の生成 (Mint) を実行します。
- */
-export async function actMintCurrency(recipientId, currency, amount) {
-    if (getCurrentState().isHalted) {
-        logToConsole(`🚨 [AUDIT/HALT 拒否]: システムがHALT状態のため、Mint作為は拒否されました。`, 'error-message');
-        return;
-    }
-
-    const state = getCurrentState();
-    const recipient = state.accounts.find(a => a.id === recipientId);
-    const currencyLogic = getCurrencyLogic(currency); 
-    
-    const validation = {
-        amount: parseFloat(amount),
-        error: null
-    };
-
-    if (!recipient) {
-        validation.error = "受取人のアカウントIDが無効です。";
-    } else if (isNaN(validation.amount) || validation.amount <= 0) {
-        validation.error = "生成額は正の値である必要があります。";
-    }
-
-    if (validation.error) {
-        logToConsole(`❌ [AUDIT/MINT 拒否]: ${validation.error}`, 'error-message');
-        await addVibration(0.2);
-        return;
-    }
-
-    // =========================================================
-    // CalcLang/LIL による自己監査実行: Mint作為の制御
-    // =========================================================
-    
-    // LIL_002監査 (Vibration超過によるALPHA生成抑制)
-    if (currency === 'ALPHA' && LIL_FLAGS.SUPPRESS_MINT_ALPHA) {
-        logToConsole(`🚨 [AUDIT/LIL_002 拒否]: Vレベル超過のため、ALPHA生成作為はLILによって拒否されました。`, 'error-message');
-        await addVibration(0.5); 
-        return;
-    }
-    
-    // LIL_005監査 (BTC最大供給量超過によるMint抑制)
-    // LILがSUPPRESS_MINT_BTCフラグを立てていれば拒否
-    if (currency === 'BTC' && LIL_FLAGS.SUPPRESS_MINT_BTC) { 
-        logToConsole(`🚨 [AUDIT/LIL_005 拒否]: BTC最大供給量（2100万）を超過しているため、Mint作為はCalcLang/LILによって拒否されました。`, 'error-message');
-        await addVibration(1.0); 
-        return;
-    }
-
-    // 通貨固有の生成者制限監査 (USD/ALPHAはCORE_BANK_Aのみ、BTCはNETWORK_GENESISなど)
-    // Mint sourceが'ANY'でない場合、実行者を制限する
-    if (currencyLogic && currencyLogic.mint_source && currencyLogic.mint_source !== 'ANY') {
-         // ここでは簡略化し、CORE_BANK_A以外の生成を阻止するロジックをシミュレート
-         if (recipientId !== 'CORE_BANK_A' && currencyLogic.mint_source !== 'NETWORK_GENESIS') {
-            logToConsole(`🚨 [AUDIT/MINT_SOURCE 拒否]: ${currency} の論理は **CORE_BANK_A** のみが生成できる制限があるため、拒否されました。`, 'error-message');
-            await addVibration(0.5); 
-            return;
-         }
-    }
-
-    // 作為の実行（通貨の生成）
-    recipient[currency] = (recipient[currency] || 0) + validation.amount;
-    
-    const newAccounts = state.accounts.map(acc => {
-        if (acc.id === recipientId) return recipient;
-        return acc;
-    });
-
-    await saveSystemState({ accounts: newAccounts });
-    logToConsole(`[AUDIT/MINT]: アカウント **${recipientId}** へ ${validation.amount.toFixed(2)} ${currency} が新しく**生成**されました。`, 'audit-message');
-    
-    // LIL_006による電力コスト増倍率の適用
-    const baseVibeCost = 3 * (currencyLogic?.vibe_sensitivity || 1.0);
-    const finalVibeCost = baseVibeCost * LIL_FLAGS.ENERGY_COST_MULTIPLIER; // 増倍率を乗算
-    
-    await addVibration(finalVibeCost);
-}
+    // ... その他の監査作為が続く ...
+};
