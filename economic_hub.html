@@ -3,173 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSGAI-Z - 経済ハブ</title>
+    <title>経済ハブ - Ωα ロゴス監査プロトコル</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .btn-nav {
-            @apply p-3 text-sm font-semibold rounded-lg transition duration-200 hover:opacity-80;
-        }
-        .account-card {
-            @apply bg-gray-700 p-4 rounded-lg shadow-md border border-gray-600;
-        }
-        .log-console {
-            @apply h-64 overflow-y-scroll bg-gray-800 p-3 text-xs rounded-lg border border-gray-700 font-mono;
-        }
-        .audit-message { color: #60a5fa; } /* blue-400 */
-        .error-message { color: #f87171; } /* red-400 */
-        .system-message { color: #a78bfa; } /* violet-400 */
+        .card { @apply bg-gray-800/70 p-6 rounded-xl shadow-lg border border-gray-700; }
+        .input-style { @apply w-full p-2 rounded bg-gray-600 text-white border border-gray-500 focus:ring-purple-500 focus:border-purple-500; }
+        .btn-style { @apply w-full px-4 py-2 font-bold rounded transition; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-8">
     
-    <div class="flex justify-between items-center mb-8 border-b border-green-500 pb-4">
-        <h1 class="text-3xl font-extrabold text-green-400">
-            💰 経済ハブ (通貨の創世と作為)
-        </h1>
-        <div class="space-x-4">
-             <a href="index.html" class="btn-nav bg-purple-600">
-                🏠 トップハブへ
-            </a>
-             <a href="infrastructure_hub.html" class="btn-nav bg-teal-600">
-                ⚡ インフラハブへ
-            </a>
+    <div class="w-full max-w-4xl mx-auto space-y-8">
+        
+        <header class="border-b border-purple-500 pb-4">
+            <h1 class="text-4xl font-extrabold text-purple-400">
+                💰 経済ハブ (ALPHA通貨システム)
+            </h1>
+            <p class="text-sm text-gray-400 mt-1">監査官: <span id="user_id">USER_AUDIT_A</span> | 状態: <span id="halt_status">正常稼働</span></p>
+        </header>
+
+        <div class="card bg-purple-800/50 border-purple-700">
+            <h2 class="text-xl font-bold mb-3 text-purple-300">📈 論理的口座残高</h2>
+            <div id="account_balances" class="space-y-2 text-lg font-mono">
+                <p>USER_AUDIT_A: <span class="text-yellow-400">...</span> ALPHA</p>
+            </div>
         </div>
-    </div>
-    
-    <div class="w-full max-w-6xl mx-auto space-y-8">
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="account-card">
-                <h2 class="text-xl font-bold mb-3 text-green-300">口座残高 (USER_AUDIT_B)</h2>
-                <div id="user_balance" class="space-y-1 font-mono text-sm">
-                    </div>
-            </div>
-            <div class="account-card">
-                <h2 class="text-xl font-bold mb-3 text-yellow-300">ロゴス通貨レート (vs ALPHA)</h2>
-                <div id="currency_rates" class="space-y-1 font-mono text-sm">
-                    </div>
-            </div>
-        </div>
-        
-        <div class="account-card bg-gray-800">
-            <h2 class="text-xl font-bold mb-4 text-white">🔀 通貨送金作為 (Transfer Act)</h2>
-            <div class="grid grid-cols-4 gap-4">
-                <input type="text" id="transfer_sender" placeholder="送信元ID (例: USER_AUDIT_B)" value="USER_AUDIT_B" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <input type="text" id="transfer_recipient" placeholder="受信先ID (例: CORE_BANK_A)" value="CORE_BANK_A" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <input type="text" id="transfer_currency" placeholder="通貨コード (例: ALPHA)" value="ALPHA" class="p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <input type="number" id="transfer_amount" placeholder="送金額" min="0.01" step="0.01" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <button onclick="executeTransferAct()" class="p-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition duration-150">
-                    送金作為を実行
-                </button>
-            </div>
-        </div>
 
-        <div class="account-card bg-gray-800">
-            <h2 class="text-xl font-bold mb-4 text-white">✨ 通貨生成作為 (Mint Act) - 論理の創世</h2>
-            <div class="grid grid-cols-4 gap-4">
-                <input type="text" id="mint_recipient" placeholder="受取人ID (例: USER_AUDIT_B)" value="USER_AUDIT_B" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <input type="text" id="mint_currency" placeholder="通貨コード (例: BTC)" value="BTC" class="p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <input type="number" id="mint_amount" placeholder="生成額" min="0.01" step="0.01" class="col-span-2 p-3 rounded-lg bg-gray-700 text-white border border-gray-600">
-                <button onclick="executeMintAct()" class="p-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition duration-150">
-                    生成作為を実行
-                </button>
-            </div>
-            <p class="text-xs text-gray-400 mt-2">
-                ※ BTCなど、LILルールで供給制限が監査されている通貨を試すと、自己監査の論理が発動します。
-            </p>
-        </div>
-
-        <div class="account-card">
-            <h2 class="text-xl font-bold mb-3 text-purple-300">監査ログコンソール</h2>
-            <div id="audit_log" class="log-console">
+            <div class="card bg-blue-800/50 border-blue-700">
+                <h2 class="text-2xl font-bold text-blue-300 mb-4">✨ 通貨生成 (MINT)</h2>
+                <p class="text-sm text-gray-300 mb-3">新規ALPHA通貨をシステムに論理的に追加する作為です。</p>
+                <div class="space-y-3">
+                    <input type="number" id="mint_amount" placeholder="生成する金額 (ALPHA)" class="input-style">
+                    <input type="text" id="mint_target" placeholder="生成先口座ID (例: USER_AUDIT_A)" class="input-style">
+                    <button onclick="executeEconomicAct('MINT')" class="btn-style bg-blue-500 text-white hover:bg-blue-600">
+                        生成作為を実行
+                    </button>
                 </div>
+            </div>
+
+            <div class="card bg-yellow-800/50 border-yellow-700">
+                <h2 class="text-2xl font-bold text-yellow-300 mb-4">💸 口座間送金 (TRANSFER)</h2>
+                <p class="text-sm text-gray-300 mb-3">既存のALPHA通貨を別の論理的口座へ送金する作為です。</p>
+                <div class="space-y-3">
+                    <input type="number" id="transfer_amount" placeholder="送金金額 (ALPHA)" class="input-style">
+                    <input type="text" id="transfer_target" placeholder="送金先ユーザーID (例: USER_AUDIT_B)" class="input-style">
+                    <button onclick="executeEconomicAct('TRANSFER')" class="btn-style bg-yellow-500 text-gray-900 hover:bg-yellow-600">
+                        送金作為を実行
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-green-800/50 border-green-700">
+            <h2 class="text-2xl font-bold text-green-300 mb-4">🏧 論理的出金 (ATM / BRIDGE-OUT)</h2>
+            <p class="text-sm text-gray-300 mb-3">
+                論理的通貨を消費し、**生計維持**のための外部の有限な価値に変換する作為です。Vibrationスコアが増加します。
+            </p>
+            <div class="space-y-3">
+                <input type="number" id="withdraw_amount" placeholder="出金金額 (ALPHA通貨)" class="input-style">
+                <button onclick="executeEconomicAct('WITHDRAW')" class="btn-style bg-green-500 text-white hover:bg-green-600">
+                    出金作為を実行 (ATM)
+                </button>
+            </div>
         </div>
         
+        <hr class="border-gray-700">
+
+        <h3 class="text-xl font-bold text-gray-300 mb-2">監査ログ (作為の履歴)</h3>
+        <div id="console" class="bg-gray-800 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono text-gray-200">
+            <div>[INIT] 経済ハブ起動。コアロジックの接続を待機中...</div>
+        </div>
+
     </div>
     
-    <script type="module">
-        import { initApp, UI_ELEMENTS, registerRenderCallback, logToConsole, getCurrentState } from './core_logic.js'; 
-        import { actTransferCurrency, actMintCurrency } from './audit_acts.js'; 
+    <script src="js/core_logic.js"></script>
+    <script src="js/audit_acts.js"></script>
+    <script src="js/logos_lil.js"></script>
+    <script src="js/firebase_config.js"></script>
+    <script src="js/dialogue_acts.js"></script>
 
-        const USER_ACCOUNT_ID = 'USER_AUDIT_B';
-
-        window.executeTransferAct = executeTransferAct;
-        window.executeMintAct = executeMintAct;
-        
-        // UI要素の登録
-        UI_ELEMENTS.user_balance = document.getElementById('user_balance');
-        UI_ELEMENTS.currency_rates = document.getElementById('currency_rates');
-        UI_ELEMENTS.audit_log = document.getElementById('audit_log');
-        
-        // ログ出力をオーバーライドし、UIコンソールにも表示
-        const originalLogToConsole = logToConsole;
-        // ... (ログ出力の上書きロジックは簡略化のため省略) ...
+    <script>
+        // 状態表示用のユーティリティをグローバルに定義（index.htmlと同様の簡略化）
+        const UI_ELEMENTS = {
+            account_balances: document.getElementById('account_balances'),
+            consoleDiv: document.getElementById('console'),
+            halt_status: document.getElementById('halt_status')
+        };
 
         /**
-         * 通貨送金作為の実行処理
+         * コンソールログにメッセージを追加する関数。
          */
-        async function executeTransferAct() {
-            const sender = document.getElementById('transfer_sender').value;
-            const recipient = document.getElementById('transfer_recipient').value;
-            const currency = document.getElementById('transfer_currency').value.toUpperCase();
-            const amount = document.getElementById('transfer_amount').value;
-            await actTransferCurrency(sender, recipient, currency, amount);
+        function logToConsole(message, className = 'text-gray-200') {
+            const now = new Date().toLocaleTimeString();
+            UI_ELEMENTS.consoleDiv.innerHTML += `<div class="mt-1 ${className}">[${now}] ${message}</div>`;
+            UI_ELEMENTS.consoleDiv.scrollTop = UI_ELEMENTS.consoleDiv.scrollHeight;
         }
-
+        
         /**
-         * 通貨生成作為の実行処理
-         */
-        async function executeMintAct() {
-            const recipient = document.getElementById('mint_recipient').value;
-            const currency = document.getElementById('mint_currency').value.toUpperCase();
-            const amount = document.getElementById('mint_amount').value;
-            await actMintCurrency(recipient, currency, amount);
-        }
-
-        /**
-         * システムの状態に基づいて経済ハブ固有のUIを更新します。
+         * システムの状態に基づいてUIを更新し、残高を表示します。
          * @param {object} state - 現在のシステム状態。
          */
-        function renderEconomicUI(state) {
-            const user = state.accounts.find(a => a.id === USER_ACCOUNT_ID);
-            
-            // 残高表示の更新
-            if (UI_ELEMENTS.user_balance && user) {
-                let html = '';
-                for (const key in user) {
-                    if (key !== 'id' && user[key] !== undefined) {
-                        html += `
-                            <p class="flex justify-between">
-                                <span>${key}:</span>
-                                <span class="text-green-300">${(user[key] || 0).toFixed(4)}</span>
-                            </p>
-                        `;
-                    }
+        window.renderMainUI = function(state) {
+            // 1. 残高表示の更新 (口座保存機能)
+            let balanceHtml = '';
+            for (const id in state.accounts) {
+                const alpha = state.accounts[id].ALPHA.toFixed(2);
+                balanceHtml += `<p>${id}: <span class="text-yellow-400">${alpha}</span> ALPHA`;
+                if (state.accounts[id].fiat_balance !== undefined) {
+                    balanceHtml += ` / 現実価値: <span class="text-green-400">${state.accounts[id].fiat_balance.toFixed(2)}</span> JPY`
                 }
-                UI_ELEMENTS.user_balance.innerHTML = html;
+                balanceHtml += '</p>';
+            }
+            UI_ELEMENTS.account_balances.innerHTML = balanceHtml;
+
+            // 2. HALTステータスの更新
+            if (UI_ELEMENTS.halt_status) {
+                 UI_ELEMENTS.halt_status.textContent = state.systemState.isHalted ? '❌ HALT (論理停止)' : '✅ 正常稼働';
+            }
+        };
+
+        /**
+         * 経済ハブからの作為を処理し、dialogue_acts.jsにルーティングする関数。
+         */
+        function executeEconomicAct(type) {
+            let command;
+            const sourceId = document.getElementById('user_id')?.textContent || 'USER_AUDIT_A';
+
+            if (type === 'MINT') {
+                const amount = document.getElementById('mint_amount').value;
+                const targetId = document.getElementById('mint_target').value;
+                if (!amount || !targetId) return logToConsole('[FAIL] 金額と生成先を入力してください。', 'text-red-400');
+                command = `MINT ${targetId} ${amount}`;
+
+            } else if (type === 'TRANSFER') {
+                const amount = document.getElementById('transfer_amount').value;
+                const targetId = document.getElementById('transfer_target').value;
+                if (!amount || !targetId) return logToConsole('[FAIL] 金額と送金先を入力してください。', 'text-red-400');
+                // TRANSFER {source} {amount} {target} 
+                command = `TRANSFER ${sourceId} ${amount} ${targetId}`; 
+
+            } else if (type === 'WITHDRAW') {
+                const amount = document.getElementById('withdraw_amount').value;
+                if (!amount) return logToConsole('[FAIL] 出金金額を入力してください。', 'text-red-400');
+                // WITHDRAW {source} {amount} (ACT_BRIDGE_OUTにマッピングされる)
+                command = `WITHDRAW ${sourceId} ${amount}`; 
             }
 
-            // レート表示の更新
-            if (UI_ELEMENTS.currency_rates) {
-                let html = '';
-                for (const currency in state.currency_rates) {
-                    if (currency !== 'ALPHA') {
-                        html += `
-                            <p class="flex justify-between">
-                                <span>1 ${currency} =</span>
-                                <span class="text-yellow-300">${state.currency_rates[currency].toFixed(4)} ALPHA</span>
-                            </p>
-                        `;
-                    }
-                }
-                UI_ELEMENTS.currency_rates.innerHTML = html;
+            if (command && window.processDialogueAsAct) {
+                logToConsole(`[LOGIC ACT] ${type} 作为を実行: ${command}`);
+                const result = window.processDialogueAsAct(command);
+
+                const status = result.log[0].status;
+                logToConsole(`-> [監査結果] ${status}: ${result.log[0].action || result.log[0].reason}`, status === 'SUCCESS' || status === 'CRITICAL_SUCCESS' ? 'text-green-400' : 'text-red-400');
+                
+                // UIの状態を更新
+                window.renderMainUI(result.newState); 
+
+            } else {
+                 logToConsole('[CRITICAL FAIL] コマンドまたはプロセス関数が未定義です。', 'text-red-500');
             }
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            await initApp(); 
-            registerRenderCallback(renderEconomicUI);
-            logToConsole("[SYSTEM]: 経済ハブ稼働。通貨生成・送金作為の準備完了。", 'system-message');
+            // initApp (firebase_config.jsでグローバルに定義) を呼び出し、状態をロード
+            if (window.initApp) {
+                const initialState = await window.initApp(); 
+                window.renderMainUI(initialState);
+            } else {
+                logToConsole('[CRITICAL FAIL] コアロジック (initApp) の読み込みに失敗しました。', 'text-red-500');
+            }
         });
     </script>
 </body>
