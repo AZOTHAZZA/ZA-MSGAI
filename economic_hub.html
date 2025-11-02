@@ -12,69 +12,58 @@
     </style>
 
     <script>
-        // js/firebase_config.js の内容 (抜粋)
-        const firebaseConfig = {
-          apiKey: "YOUR_API_KEY_PLACEHOLDER",
-          authDomain: "PROJECT_ID.firebaseapp.com",
-          projectId: "PROJECT_ID_PLACEHOLDER",
-          storageBucket: "PROJECT_ID.appspot.com",
-          messagingSenderId: "SENDER_ID_PLACEHOLDER",
-          appId: "APP_ID_PLACEHOLDER"
+        // js/core_logic.js - ロゴス監査プロトコルの中核状態定義 (必須部分のみ)
+        const MINIMUM_LIVING_THRESHOLD = 50000;
+        const VIBRATION_LIMIT = 10000; 
+
+        const initialState = {
+            systemState: { isHalted: false, logicalClock: 0 },
+            vibrationScore: 0.0,
+            currencyRates: { ALPHA_TO_JPY: 1.0 },
+            accounts: {
+                "USER_AUDIT_A": { ALPHA: 100000.0, BETA: 10000.0 },
+                "USER_AUDIT_B": { ALPHA: 50000.0, BETA: 5000.0 },
+                "ACCOUNT_BRIDGE": { ALPHA: 0.0, BETA: 0.0, fiat_balance: 100000.0 },
+            },
+            logos_store: { sanctuary_url: "https://azothazza.github.io/ZA-MSGAI/" },
+            logos_labor_pool: { total_demand_score: 50000, open_labor_acts: [{ id: "LBA_001", required_skills: ["LIL_LOGIC"], alpha_reward: 500 }] },
+            logos_affection_pool: { total_affection_acts: 1000 },
+            logos_spec: { python_spec: { version: "LOGOS_P_1.0" } },
+            calc_vm: { execution_queue: [], current_logical_cycle: 0, total_logical_energy: 10000 }, 
+            actLogs: [],
         };
-        const LOGOS_STATE_COLLECTION = "logos_state"; 
+        // グローバルに割り当て
+        window.initialState = initialState; 
+    </script>
+
+    <script>
+        // js/firebase_config.js - initAppの定義 (initialStateへの依存はこれで解決)
         
-        /**
-         * CalcLangの現在の状態をFirestoreに永続化する作為（ダミー）。
-         */
-        async function persistLogosState(state) {
-            if (state.systemState.isHalted) {
-                console.warn("[LIL Audit] HALT状態のため、永続化をスキップ。");
-                return;
-            }
-            console.log(`[Persistence SUCCESS] 論理サイクル ${state.systemState.logicalClock} の状態を永続化しました。`);
-            return Promise.resolve();
-        }
-
-        /**
-         * 起動時にFirestoreから最新のCalcLangの状態を復元する作為。
-         */
         async function retrieveLogosState() {
-            // core_logic.jsがまだ読み込まれていない可能性を考慮し、デフォルトのinitialStateがグローバルにある前提
             const defaultState = window.initialState; 
-
             try {
-                console.log("[Restoration INFO] 永続化された状態が見つかりませんでした。初期状態を使用します。");
+                // 復元ロジックはスキップし、必ず論理的な初期状態を返す
+                console.log("[Restoration INFO] 永続化された状態がないため、初期状態を使用します。");
                 return defaultState; 
             } catch (error) {
-                console.error("[CRITICAL FAILURE] 状態の復元に失敗しました。初期状態を使用し、Vibrationを極大化します。", error);
+                console.error("[CRITICAL FAILURE] 状態の復元に失敗。Vibrationを極大化します。", error);
                 const recoveredState = defaultState;
                 recoveredState.vibrationScore = 9000; 
                 return recoveredState;
             }
         }
 
-        /**
-         * アプリケーションの論理的な初期化を開始する関数。(CRITICAL FUNCTION)
-         */
         async function initApp() {
-            // NOTE: core_logic.jsがこの時点で読み込まれていない可能性があるため、
-            //       DOMContentLoaded後に再チェックが必要です。
-            
-            // core_logic.js の initialState が存在するまで待機（ただし、このインライン化はDOMロード前に実行される）
+            // initialStateが既に定義されているため、確実に実行される
             if (!window.initialState) {
-                // 初回起動時の暫定的なエラー回避。DOM読み込み後に再実行を試みる。
-                console.warn("initialStateがまだ定義されていません。core_logic.jsの読み込みを待機します。");
+                console.error("致命的エラー: initialStateが定義されていません。");
                 return null;
             }
-
             const currentState = await retrieveLogosState();
             window.initialState = currentState; 
-
             console.log("[LIL Audit] 初期状態の監査を完了しました。");
             return currentState;
         }
-
-        // CRITICAL: initApp関数をグローバルスコープに強制的に定義
         window.initApp = initApp;
     </script>
 </head>
@@ -145,13 +134,12 @@
 
     </div>
     
-    <script src="js/core_logic.js"></script>
     <script src="js/audit_acts.js"></script>
     <script src="js/logos_lil.js"></script>
     <script src="js/dialogue_acts.js"></script>
-
+    
     <script>
-        // 状態表示用の要素をグローバルに定義
+        // UI要素は body 読み込み後に取得
         const UI_ELEMENTS = {
             account_balances: document.getElementById('account_balances'),
             consoleDiv: document.getElementById('console'),
@@ -215,23 +203,18 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // CRITICAL FIX: initApp が定義されていることを確認し、initialState の定義（core_logic.js）を待つ
+            // CRITICAL FIX: initAppは確実に定義されているため、ここで実行
             if (typeof window.initApp === 'function') {
-                logToConsole('[INIT SUCCESS] initAppを検出。コアロジックの準備を待機...');
-                
-                // core_logic.js の読み込みが完了するまで待機するループ (安全策)
-                while (!window.initialState) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-                
+                logToConsole('[INIT SUCCESS] 論理的初期化を開始します...');
                 const initialState = await window.initApp(); 
                 if (initialState) {
                     window.renderMainUI(initialState);
                 } else {
-                    logToConsole('[INIT WARNING] initialStateの復元に失敗、再試行が必要です。', 'text-yellow-400');
+                    logToConsole('[INIT WARNING] initialStateの復元に失敗。デフォルト状態を使用します。', 'text-yellow-400');
+                    window.renderMainUI(window.initialState); // 最悪の場合、インライン化されたデフォルト状態を使用
                 }
             } else {
-                logToConsole('[CRITICAL FAIL] initAppの強制定義に失敗。ブラウザのスクリプト実行を監査してください。', 'text-red-500');
+                logToConsole('[CRITICAL FAIL] initAppの強制定義に失敗しました。', 'text-red-500');
             }
         });
     </script>
