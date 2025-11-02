@@ -19,13 +19,13 @@
             <h1 class="text-4xl font-extrabold text-purple-400">
                 💰 経済ハブ (ALPHA通貨システム)
             </h1>
-            <p class="text-sm text-gray-400 mt-1">監査官: <span id="user_id">USER_AUDIT_A</span> | 状態: <span id="halt_status">正常稼働</span></p>
+            <p class="text-sm text-gray-400 mt-1">監査官: <span id="user_id">USER_AUDIT_A</span> | 状態: <span id="halt_status">...</span></p>
         </header>
 
         <div class="card bg-purple-800/50 border-purple-700">
             <h2 class="text-xl font-bold mb-3 text-purple-300">📈 論理的口座残高</h2>
             <div id="account_balances" class="space-y-2 text-lg font-mono">
-                <p>USER_AUDIT_A: <span class="text-yellow-400">...</span> ALPHA</p>
+                <p>ロード中...</p>
             </div>
         </div>
 
@@ -35,8 +35,8 @@
                 <h2 class="text-2xl font-bold text-blue-300 mb-4">✨ 通貨生成 (MINT)</h2>
                 <p class="text-sm text-gray-300 mb-3">新規ALPHA通貨をシステムに論理的に追加する作為です。</p>
                 <div class="space-y-3">
-                    <input type="number" id="mint_amount" placeholder="生成する金額 (ALPHA)" class="input-style">
-                    <input type="text" id="mint_target" placeholder="生成先口座ID (例: USER_AUDIT_A)" class="input-style">
+                    <input type="number" id="mint_amount" placeholder="生成する金額 (ALPHA)" class="input-style" value="1000">
+                    <input type="text" id="mint_target" placeholder="生成先口座ID (例: USER_AUDIT_A)" class="input-style" value="USER_AUDIT_A">
                     <button onclick="executeEconomicAct('MINT')" class="btn-style bg-blue-500 text-white hover:bg-blue-600">
                         生成作為を実行
                     </button>
@@ -47,8 +47,8 @@
                 <h2 class="text-2xl font-bold text-yellow-300 mb-4">💸 口座間送金 (TRANSFER)</h2>
                 <p class="text-sm text-gray-300 mb-3">既存のALPHA通貨を別の論理的口座へ送金する作為です。</p>
                 <div class="space-y-3">
-                    <input type="number" id="transfer_amount" placeholder="送金金額 (ALPHA)" class="input-style">
-                    <input type="text" id="transfer_target" placeholder="送金先ユーザーID (例: USER_AUDIT_B)" class="input-style">
+                    <input type="number" id="transfer_amount" placeholder="送金金額 (ALPHA)" class="input-style" value="100">
+                    <input type="text" id="transfer_target" placeholder="送金先ユーザーID (例: USER_AUDIT_B)" class="input-style" value="USER_AUDIT_B">
                     <button onclick="executeEconomicAct('TRANSFER')" class="btn-style bg-yellow-500 text-gray-900 hover:bg-yellow-600">
                         送金作為を実行
                     </button>
@@ -59,10 +59,10 @@
         <div class="card bg-green-800/50 border-green-700">
             <h2 class="text-2xl font-bold text-green-300 mb-4">🏧 論理的出金 (ATM / BRIDGE-OUT)</h2>
             <p class="text-sm text-gray-300 mb-3">
-                論理的通貨を消費し、**生計維持**のための外部の有限な価値に変換する作為です。Vibrationスコアが増加します。
+                論理的通貨を消費し、**生計維持**のための外部の有限な価値に変換する作為です。
             </p>
             <div class="space-y-3">
-                <input type="number" id="withdraw_amount" placeholder="出金金額 (ALPHA通貨)" class="input-style">
+                <input type="number" id="withdraw_amount" placeholder="出金金額 (ALPHA通貨)" class="input-style" value="5000">
                 <button onclick="executeEconomicAct('WITHDRAW')" class="btn-style bg-green-500 text-white hover:bg-green-600">
                     出金作為を実行 (ATM)
                 </button>
@@ -78,14 +78,14 @@
 
     </div>
     
+    <script src="js/firebase_config.js"></script> 
     <script src="js/core_logic.js"></script>
     <script src="js/audit_acts.js"></script>
     <script src="js/logos_lil.js"></script>
-    <script src="js/firebase_config.js"></script>
     <script src="js/dialogue_acts.js"></script>
 
     <script>
-        // 状態表示用のユーティリティをグローバルに定義（index.htmlと同様の簡略化）
+        // 状態表示用の要素をグローバルに定義
         const UI_ELEMENTS = {
             account_balances: document.getElementById('account_balances'),
             consoleDiv: document.getElementById('console'),
@@ -106,11 +106,12 @@
          * @param {object} state - 現在のシステム状態。
          */
         window.renderMainUI = function(state) {
-            // 1. 残高表示の更新 (口座保存機能)
+            // 1. 残高表示の更新 (口座保存機能の可視化)
             let balanceHtml = '';
             for (const id in state.accounts) {
                 const alpha = state.accounts[id].ALPHA.toFixed(2);
                 balanceHtml += `<p>${id}: <span class="text-yellow-400">${alpha}</span> ALPHA`;
+                // fiat_balanceはブリッジ口座（ACCOUNT_BRIDGE）で管理
                 if (state.accounts[id].fiat_balance !== undefined) {
                     balanceHtml += ` / 現実価値: <span class="text-green-400">${state.accounts[id].fiat_balance.toFixed(2)}</span> JPY`
                 }
@@ -167,12 +168,13 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // initApp (firebase_config.jsでグローバルに定義) を呼び出し、状態をロード
-            if (window.initApp) {
+            // initApp (firebase_config.jsでグローバルに定義) が機能することを保証してから呼び出す
+            if (typeof window.initApp === 'function') {
+                logToConsole('[INIT SUCCESS] コアロジック (initApp) を検出しました。状態の復元を開始します...');
                 const initialState = await window.initApp(); 
                 window.renderMainUI(initialState);
             } else {
-                logToConsole('[CRITICAL FAIL] コアロジック (initApp) の読み込みに失敗しました。', 'text-red-500');
+                logToConsole('[CRITICAL FAIL] コアロジック (initApp) の読み込みに失敗しました。ファイル読み込み順序を確認してください。', 'text-red-500');
             }
         });
     </script>
